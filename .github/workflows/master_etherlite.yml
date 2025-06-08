@@ -11,31 +11,47 @@ on:
 
 jobs:
   build:
-    runs-on: windows-latest
+     # Permissions for the build job 
     permissions:
       contents: read #This is required for actions/checkout
+    runs-on: windows-latest
+    # runs-on: ubuntu-latest # Optional: .NET Core builds often run faster/cheaper on ubuntu
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
       - name: Set up .NET Core
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '8.x'
+          
+      - name: Restore dependencies
+        run: dotnet restore
+        
+      # Renamed for clarity - includes restore/build/publish
+      - name: dotnet build and publish
+        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp" --no-restore # no-restore as we did it explicitly
 
-      - name: Build with dotnet
-        run: dotnet build --configuration Release
-
-      - name: dotnet publish
-        run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp"
+      # Step removed: dotnet build is included in dotnet publish by default unless --no-build is specified.
+      # - name: Build with dotnet 
+      #  run: dotnet build --configuration Release 
+      
+      # Step removed: Combined into the 'dotnet build and publish' step above
+      # - name: dotnet publish 
+      # run: dotnet publish -c Release -o "${{env.DOTNET_ROOT}}/myapp" 
 
       - name: Upload artifact for deployment job
         uses: actions/upload-artifact@v4
         with:
           name: .net-app
-          path: ${{env.DOTNET_ROOT}}/myapp
+           # Ensure the path matches the -o parameter in dotnet publish
+          path: ${{env.DOTNET_ROOT}}/myapp 
 
   deploy:
+    # Permissions for the deploy job (publish profile needs no special GITHUB_TOKEN perms)
+    permissions:
+       contents: none # Best practice: give only required permissions
     runs-on: windows-latest
     needs: build
     environment:
@@ -47,6 +63,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: .net-app
+          # path: . # downloads to current directory by default, package: . expects this
       
       - name: Deploy to Azure Web App
         id: deploy-to-webapp
@@ -54,5 +71,21 @@ jobs:
         with:
           app-name: 'EtherLite'
           slot-name: 'Production'
+           # package: . means deploy the content of the current directory, 
+           # which is where download-artifact placed the files.
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_664FC79024D2419E8372397D05448D77 }}
+          # ++++++++++++++++++++++++++++++++++++++++++++++++++++
+          # KEY CHANGE: Add Application Settings
+          # This maps GitHub Secrets to Azure App Service Settings.
+          # Syntax: -SettingName Value
+          # ASP.NET Core maps 'Section__Key' to JSON "Section" : { "Key" : "..." }
+          # Azure App Service will restart after settings are applied.
+          # ++++++++++++++++++++++++++++++++++++++++++++++++++++
+          app-settings: |
+            -Ethereum__Mainnet ${{ secrets.RPC_URL_MAINNET }}
+            -Ethereum__Sepolia ${{ secrets.RPC_URL_SEPOLIA }}
+            -Ethereum__Arb_Mainnet ${{ secrets.RPC_URL_ARB_MAINNET }}
+            -Ethereum__Op ${{ secrets.RPC_URL_OP }}
+            -Ethereum__PolygonMainnet ${{ secrets.RPC_URL_POLYGONMAINNET }}
+           # Add any other settings here e.g. -ASPNETCORE_ENVIRONMENT Production

@@ -1,0 +1,12 @@
+﻿/* style.css */
+
+.result-container {
+    display: none;
+    margin-top: 1rem;
+}
+
+.loading-spinner {
+    display: none;
+    margin-top: 1rem;
+    text-align: center;
+}

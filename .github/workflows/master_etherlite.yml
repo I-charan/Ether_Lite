@@ -55,4 +55,4 @@ jobs:
           app-name: 'EtherLite'
           slot-name: 'Production'
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_664FC79024D2419E8372397D05448D77 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_AFA35468C2EA41AC994A5BD6CCC3CB15 }}

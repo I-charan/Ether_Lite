@@ -1,4 +1,4 @@
-using Nethereum.Web3;
+﻿using Nethereum.Web3;
 using Ether_Lite.Services.Extensions;
 using Ether_Lite.Services.Interface;
 using Ether_Lite.Services;
@@ -12,7 +12,9 @@ builder.Services.AddSwaggerGen();
 
 // Register Web3 and Wallet Services
 ConfigureWeb3Services(builder);
+builder.Services.AddHttpClient(); // ✅ ADD THIS LINE
 builder.Services.AddScoped<IWalletInfoService, WalletInfoService>();
+builder.Services.AddScoped<IWalletBalService, WalletInfoService>();
 
 // CORS setup
 builder.Services.AddCors(options =>

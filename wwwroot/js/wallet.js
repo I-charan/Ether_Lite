@@ -21,10 +21,10 @@ async function checkWallet() {
         // Map frontend network names to backend endpoint patterns
         const endpointMap = {
             ethereum: 'ethereum/mainnet',   // ✅ This is needed if the <select> value is "ethereum"
-            mainnet: 'ethereum/mainnet',   // ✅ Optional alias if user selects "mainnet"
-            sepolia: 'ethereum/sepolia',
+            eth: 'ethereum/mainnet',   // ✅ Optional alias if user selects "mainnet"
+            sep: 'ethereum/sepolia',
             arb: 'arb',
-            polygonmainnet: 'polygon/mainnet',
+            pol: 'polygon/mainnet',
             op: 'op'
         };
 
@@ -93,10 +93,10 @@ function displayWalletInfo(data, network) {
 
 function getExplorerUrl(network, txHash) {
     const explorers = {
-        'mainnet': `https://etherscan.io/tx/${txHash}`,
-        'sepolia': `https://sepolia.etherscan.io/tx/${txHash}`,
+        'eth': `https://etherscan.io/tx/${txHash}`,
+        'sep': `https://sepolia.etherscan.io/tx/${txHash}`,
         'arb': `https://arbiscan.io/tx/${txHash}`,
-        'polygonmainnet': `https://polygonscan.com/tx/${txHash}`,
+        'pol': `https://polygonscan.com/tx/${txHash}`,
         'op': `https://optimistic.etherscan.io/tx/${txHash}`
     };
     return explorers[network.toLowerCase()] || `https://etherscan.io/tx/${txHash}`;
@@ -112,10 +112,10 @@ function showAlert(message, type) {
 
 function getCurrencySymbol(network) {
     const symbols = {
-        'mainnet': 'ETH',
-        'sepolia': 'ETH',
+        'eth': 'ETH',
+        'sep': 'ETH',
         'arb': 'ETH',
-        'polygonmainnet': 'MATIC',
+        'pol': 'MATIC',
         'op': 'ETH'
     };
     return symbols[network.toLowerCase()] || 'ETH';
@@ -123,10 +123,10 @@ function getCurrencySymbol(network) {
 
 function getCurrencyName(network) {
     const names = {
-        'mainnet': 'Ethereum Mainnet',
-        'sepolia': 'Ethereum Sepolia',
+        'eth': 'Ethereum Mainnet',
+        'sep': 'Ethereum Sepolia',
         'arb': 'Arbitrum Mainnet',
-        'polygonmainnet': 'Polygon Mainnet',
+        'pol': 'Polygon Mainnet',
         'op': 'Optimism Mainnet'
     };
     return names[network.toLowerCase()] || 'Ethereum';

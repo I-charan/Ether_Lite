@@ -14,7 +14,7 @@ using Ether_Lite.Services.Interface;
 
 namespace Ether_Lite.Services
 {
-    public sealed class WalletInfoService : IWalletInfoService
+    public sealed class WalletInfoService : IWalletInfoService,IWalletBalService
     {
         private readonly ILogger<WalletInfoService> _logger;
         private readonly Dictionary<string, IWeb3> _web3Clients;
@@ -27,27 +27,38 @@ namespace Ether_Lite.Services
 
             // Read every network under the "Ethereum" section
             IConfigurationSection ethSection = configuration.GetSection("Ethereum");
+            string alchemyApi = configuration["AlchemyApi"];
+
             if (!ethSection.Exists())
             {
                 _logger.LogCritical("Configuration section 'Ethereum' not found.");
-                throw new InvalidOperationException(
-                    "Missing 'Ethereum' section in configuration.");
+                throw new InvalidOperationException("Missing 'Ethereum' section in configuration.");
             }
 
             foreach (IConfigurationSection child in ethSection.GetChildren())
             {
-                string networkName = child.Key;   // e.g. "Sepolia"
-                string rpcUrl = child.Value; // full HTTPS URL
+                string networkName = child.Key;           // "Eth", "Sep", etc.
+                string? baseUrl = child.Value;            // base URL without key
 
-                if (string.IsNullOrWhiteSpace(rpcUrl))
+                if (string.IsNullOrWhiteSpace(baseUrl))
                 {
-                    _logger.LogWarning("RPC URL not configured for network '{Network}'.", networkName);
+                    _logger.LogWarning("RPC base URL missing for network '{Network}'. Skipping.", networkName);
                     continue;
+                }
+
+                if (string.IsNullOrWhiteSpace(alchemyApi))
+                {
+                    _logger.LogCritical("Alchemy API key is missing. Cannot construct full RPC URLs.");
+                    throw new InvalidOperationException("Missing Alchemy API key in configuration.");
                 }
 
                 try
                 {
-                    _web3Clients[networkName] = new Web3(rpcUrl);
+                    string fullUrl = baseUrl.EndsWith("/")
+                        ? baseUrl + alchemyApi
+                        : baseUrl + "/" + alchemyApi;
+
+                    _web3Clients[networkName] = new Web3(fullUrl);
                     _logger.LogInformation("Initialized Web3 client for {Network}.", networkName);
                 }
                 catch (Exception ex)
@@ -55,6 +66,13 @@ namespace Ether_Lite.Services
                     _logger.LogError(ex, "Failed to initialize Web3 client for {Network}.", networkName);
                 }
             }
+
+            if (_web3Clients.Count == 0)
+            {
+                _logger.LogCritical("No Web3 clients were initialized successfully.");
+                throw new InvalidOperationException("No blockchain networks could be initialized.");
+            }
+
 
             if (_web3Clients.Count == 0)
             {
@@ -78,7 +96,41 @@ namespace Ether_Lite.Services
 
             throw new KeyNotFoundException($"Network '{networkName}' is not configured.");
         }
+        public async Task<List<WalletBalance>> GetTopWalletsByBalance(string network, int topN = 10)
+        {
+            if (!_web3Clients.TryGetValue(network, out var web3))
+                throw new ArgumentException($"Unsupported network: {network}", nameof(network));
 
+            var result = new List<WalletBalance>();
+            var latestBlock = await web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
+            var block = await web3.Eth.Blocks.GetBlockWithTransactionsByNumber.SendRequestAsync(new BlockParameter(latestBlock));
+
+            // Get unique addresses from recent transactions
+            var uniqueAddresses = block.Transactions
+                .SelectMany(t => new[] { t.From, t.To })
+                .Where(a => !string.IsNullOrEmpty(a))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Take(1000) // Limit to 1000 addresses for performance
+                .ToList();
+
+            // Get balances for each address
+            var balanceTasks = uniqueAddresses.Select(async address =>
+            {
+                var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(address);
+                return new WalletBalance
+                {
+                    Address = address,
+                    BalanceInEth = Web3.Convert.FromWei(balanceWei)
+                };
+            });
+
+            var balances = await Task.WhenAll(balanceTasks);
+
+            return balances
+                .OrderByDescending(w => w.BalanceInEth)
+                .Take(topN)
+                .ToList();
+        }
 
         public async Task<WalletInfoResult> GetWalletInfo(
             string network,

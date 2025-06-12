@@ -24,26 +24,26 @@ namespace Ether_Lite.Controllers
         // ETH Mainnet & Sepolia
         // ------------------------
         [HttpGet("ethereum/mainnet/{address}")]
-        public Task<IActionResult> GetMainnetWalletInfo(string address, [FromQuery] int limit = 100_000)
+        public Task<IActionResult> GetMainnetWalletInfo(string address, [FromQuery] int limit = 10000000)
             => GetWalletInfo("Eth", address, limit);
 
         [HttpGet("ethereum/sepolia/{address}")]
-        public Task<IActionResult> GetSepoliaWalletInfo(string address, [FromQuery] int limit = 100_000)
+        public Task<IActionResult> GetSepoliaWalletInfo(string address, [FromQuery] int limit = 10000000)
             => GetWalletInfo("Sep", address, limit);
 
         // ------------------------
         // Arbitrum, Polygon, Optimism
         // ------------------------
         [HttpGet("arb/{address}")]
-        public Task<IActionResult> GetArbWalletInfo(string address, [FromQuery] int limit = 100_000)
+        public Task<IActionResult> GetArbWalletInfo(string address, [FromQuery] int limit = 10000000)
             => GetWalletInfo("Arb", address, limit);
 
         [HttpGet("polygon/mainnet/{address}")]
-        public Task<IActionResult> GetPolygonMainnetWalletInfo(string address, [FromQuery] int limit = 100_000)
+        public Task<IActionResult> GetPolygonMainnetWalletInfo(string address, [FromQuery] int limit = 10000000)
             => GetWalletInfo("Pol", address, limit);
 
         [HttpGet("op/{address}")]
-        public Task<IActionResult> GetOpWalletInfo(string address, [FromQuery] int limit = 100_000)
+        public Task<IActionResult> GetOpWalletInfo(string address, [FromQuery] int limit = 10000000)
             => GetWalletInfo("Op", address, limit);
 
         [HttpGet("top-balances/{network}")]

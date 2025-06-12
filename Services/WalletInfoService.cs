@@ -132,19 +132,18 @@ namespace Ether_Lite.Services
                 .ToList();
         }
 
-        public async Task<WalletInfoResult> GetWalletInfo(
-            string network,
-            string address,
-            int limit = 1_000_000)
+
+
+        public async Task<WalletInfoResult> GetWalletInfo(string network, string address, int limit = 1_000_000)
         {
-            // 1️⃣  Validate input & get client
+            // ✅ Validate input
             if (!_web3Clients.TryGetValue(network, out var web3))
                 throw new ArgumentException($"Unsupported network: {network}", nameof(network));
 
             if (!AddressUtil.Current.IsValidEthereumAddressHexFormat(address))
                 throw new ArgumentException("Invalid Ethereum address.", nameof(address));
 
-            // 2️⃣  Basic account info
+            // ✅ Get balance, gas price, transaction count
             var txCount = await web3.Eth.Transactions.GetTransactionCount.SendRequestAsync(address);
             var balanceWei = await web3.Eth.GetBalance.SendRequestAsync(address);
             var balanceEth = Web3.Convert.FromWei(balanceWei);
@@ -152,6 +151,7 @@ namespace Ether_Lite.Services
             var gasPrice = await web3.Eth.GasPrice.SendRequestAsync();
             var gasPriceG = Web3.Convert.FromWei(gasPrice, UnitConversion.EthUnit.Gwei);
 
+            // ✅ No transaction case
             if (txCount.Value == 0)
             {
                 return new WalletInfoResult
@@ -164,7 +164,7 @@ namespace Ether_Lite.Services
                 };
             }
 
-            // 3️⃣  Scan blocks backwards (up to `limit`)
+            // ✅ Scan blocks from latest
             var latestBlock = await web3.Eth.Blocks.GetBlockNumber.SendRequestAsync();
             BigInteger startBlock = latestBlock.Value;
             BigInteger endBlock = BigInteger.Max(BigInteger.Zero, startBlock - limit);
@@ -175,22 +175,23 @@ namespace Ether_Lite.Services
                     .GetBlockWithTransactionsByNumber
                     .SendRequestAsync(new BlockParameter(new HexBigInteger(i)));
 
-                var relatedTxs = block.Transactions
-                    .Where(t => string.Equals(t.From, address, StringComparison.OrdinalIgnoreCase) ||
-                                string.Equals(t.To, address, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
+                if (block == null || block.Transactions == null || block.Transactions.Length == 0)
+                    continue;
 
-                if (!relatedTxs.Any()) continue;
+                // ✅ Try to get the last transaction from/to the wallet
+                var relatedTx = block.Transactions
+                    .Reverse() // check latest first
+                    .FirstOrDefault(tx =>
+                        string.Equals(tx.From, address, StringComparison.OrdinalIgnoreCase) ||
+                        string.Equals(tx.To, address, StringComparison.OrdinalIgnoreCase));
 
-                var lastTx = relatedTxs.Last();
-                var txBlock = await web3.Eth.Blocks
-                    .GetBlockWithTransactionsByNumber
-                    .SendRequestAsync(new BlockParameter(lastTx.BlockNumber));
+                if (relatedTx == null) continue;
 
-                // Timestamp → UTC
-                long unixSeconds = (long)txBlock.Timestamp.Value;
+                // ✅ Get timestamp
+                long unixSeconds = (long)block.Timestamp.Value;
                 var txDateTime = DateTimeOffset.FromUnixTimeSeconds(unixSeconds).UtcDateTime;
 
+                // ✅ Return result immediately
                 return new WalletInfoResult
                 {
                     WalletAddress = address,
@@ -200,18 +201,18 @@ namespace Ether_Lite.Services
                     Network = network,
                     LastTransaction = new TransactionInfo
                     {
-                        TxHash = lastTx.TransactionHash,
-                        From = lastTx.From,
-                        To = lastTx.To,
-                        ValueInEth = Web3.Convert.FromWei(lastTx.Value),
-                        GasUsed = lastTx.Gas.Value,
-                        BlockNumber = lastTx.BlockNumber.Value,
+                        TxHash = relatedTx.TransactionHash,
+                        From = relatedTx.From,
+                        To = relatedTx.To,
+                        ValueInEth = Web3.Convert.FromWei(relatedTx.Value),
+                        GasUsed = relatedTx.Gas.Value,
+                        BlockNumber = relatedTx.BlockNumber.Value,
                         DateTimeUtc = txDateTime
                     }
                 };
             }
 
-            // 4️⃣  No tx in scanned range
+            // ✅ Fallback if no tx found
             return new WalletInfoResult
             {
                 Message = $"No transactions found in the last {limit} blocks.",
@@ -221,5 +222,6 @@ namespace Ether_Lite.Services
                 Network = network
             };
         }
+
     }
 }
